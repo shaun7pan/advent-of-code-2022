@@ -1,6 +1,4 @@
-use std::fs::File;
-use std::io::{self, BufRead};
-use std::path::Path;
+use utils::read_lines;
 
 #[derive(Debug, PartialEq)]
 pub enum Hand {
@@ -49,14 +47,6 @@ fn main() {
     }
     println!("Part1: {:?}", score_board_part1.iter().sum::<i32>());
     println!("Part2: {:?}", score_board_part2.iter().sum::<i32>());
-}
-
-fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-where
-    P: AsRef<Path>,
-{
-    let file = File::open(filename)?;
-    Ok(io::BufReader::new(file).lines())
 }
 
 fn get_score_per_round(s: &str, t: &str) -> i32 {
