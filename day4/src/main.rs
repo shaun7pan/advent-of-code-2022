@@ -30,5 +30,5 @@ fn main() {
     }
 
     println!("The answer of part1 is: {}", part1_answer);
-    println!("The answer of part1 is: {}", part2_answer);
+    println!("The answer of part2 is: {}", part2_answer);
 }
