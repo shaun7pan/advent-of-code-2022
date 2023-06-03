@@ -76,4 +76,4 @@ fn search(d: &Dir, min: u64) -> Option<u64> {
         .flat_map(|d| [Some(d.1), search(d, min)])
         .flatten()
         .min()
-}
+95437
