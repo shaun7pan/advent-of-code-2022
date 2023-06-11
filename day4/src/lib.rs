@@ -4,7 +4,6 @@ use std::ops::RangeInclusive;
 use nom::bytes::complete::tag;
 use nom::character::complete::{self, newline};
 use nom::multi::separated_list1;
-use nom::sequence::separated_pair;
 use nom::IResult;
 
 // parse `2-4` to `2..=4`
@@ -21,7 +20,7 @@ fn parse_single_range(input: &str) -> IResult<&str, RangeInclusive<u32>> {
 // parse '2-4, 3-6' to `[(2..=4), (3..=6)]`
 fn line(input: &str) -> IResult<&str, (RangeInclusive<u32>, RangeInclusive<u32>)> {
     let (input, (left_range, right_range)) =
-        separated_pair(parse_single_range, tag(","), parse_single_range)(input)?;
+        nom::sequence::separated_pair(parse_single_range, tag(","), parse_single_range)(input)?;
 
     Ok((input, (left_range, right_range)))
 }
