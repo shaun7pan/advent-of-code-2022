@@ -1,156 +1,163 @@
-use std::collections::btree_map::Entry;
-use std::collections::BTreeMap;
-use std::collections::HashMap;
+use itertools::Itertools;
 
 use nom::branch::alt;
-use nom::bytes::complete::tag;
-use nom::character::complete::i32;
-use nom::character::complete::newline;
-use nom::multi::separated_list1;
-use nom::sequence::separated_pair;
-use nom::IResult;
+use nom::bytes::streaming::tag;
+use nom::character::complete::{self, newline};
+use nom::sequence::preceded;
+use nom::Parser;
+use nom::{multi::separated_list1, IResult};
+use std::collections::BTreeMap;
+use std::ops::RangeInclusive;
 
-#[derive(Debug, Clone, Copy)]
-enum Action {
+#[derive(Debug)]
+enum Instruction {
     Noop,
-    Addx(i32),
+    Add(i32),
 }
 
-fn addx(input: &str) -> IResult<&str, Action> {
-    let (input, (_, count)) = separated_pair(tag("addx"), tag(" "), i32)(input)?;
-    Ok((input, Action::Addx(count)))
+impl Instruction {
+    fn cycles(&self) -> u32 {
+        match self {
+            Self::Noop => 1,
+            Self::Add(_) => 2,
+        }
+    }
 }
+fn instruction_set(input: &str) -> IResult<&str, Vec<Instruction>> {
+    let (input, vecs) = separated_list1(
+        newline,
+        alt((
+            (tag("noop").map(|_| Instruction::Noop)),
+            preceded(tag("addx "), complete::i32).map(|num| Instruction::Add(num)),
+        )),
+    )(input)?;
 
-fn noop(input: &str) -> IResult<&str, Action> {
-    let (input, _) = tag("noop")(input)?;
-    Ok((input, Action::Noop))
-}
-
-fn parse_actions(input: &str) -> IResult<&str, Vec<Action>> {
-    let (input, actions) = separated_list1(newline, alt((addx, noop)))(input)?;
-    Ok((input, actions))
+    Ok((input, vecs))
 }
 pub fn process_part1(input: &str) -> String {
-    let (_, actions) = parse_actions(input).unwrap();
-    let mut result = BTreeMap::new();
-    let mut cycle = 1;
-    let mut value = 1;
+    let known_cycles = [20, 60, 100, 140, 180, 220];
+    let mut scores: BTreeMap<u32, i32> = BTreeMap::new();
 
-    actions.iter().for_each(|action| match action {
-        Action::Addx(n) => {
-            // addx cycle 1 insert last value, cycle 2 insert new value
-            cycle += 1;
-            result.entry(cycle).or_insert(value);
-            cycle += 1;
-            value += n;
-            result.entry(cycle).or_insert(value);
-        }
-        Action::Noop => {
-            // noop always insert last value
-            cycle += 1;
-            result.entry(cycle).or_insert(value);
-        }
-    });
+    let (_, instructions) = instruction_set(input).unwrap();
+    let mut x: i32 = 1;
+    let mut cycles: u32 = 0;
 
-    let source = vec![20, 60, 100, 140, 180, 220];
-    source
+    for instruction in instructions.iter() {
+        if known_cycles.contains(&(cycles + 1)) {
+            scores.insert(cycles + 1, (cycles as i32 + 1) * x);
+        };
+
+        if known_cycles.contains(&(cycles + 2)) {
+            scores.insert(cycles + 2, (cycles as i32 + 2) * x);
+        };
+
+        cycles += instruction.cycles();
+        match instruction {
+            Instruction::Noop => {}
+            Instruction::Add(num) => {
+                x += num;
+            }
+        }
+    }
+
+    dbg!(&scores);
+    scores
         .iter()
-        .fold(0, |acc, &x| acc + (result.get(&x.clone()).unwrap() * x))
+        .map(|(_key, value)| value)
+        .sum::<i32>()
         .to_string()
 }
 
-pub fn process_part2(input: &str) -> String {
-    let (_, actions) = parse_actions(input).unwrap();
-    let mut result = BTreeMap::new();
-    let mut cycle = 1;
-    let mut value = 1; // value of x
-    let mut cur = 0; // current position
-    let mut sprite_range = 0..=0;
+struct Computer {
+    x: i32,
+    cycles: u32,
+    display_string: String,
+}
 
-    // println!("Sprite position: {}..{}", value - 1, value + 1);
-    actions.iter().for_each(|action| {
-        // println!("The value: {}", value);
+impl std::fmt::Display for Computer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.display_string
+                .chars()
+                .chunks(40)
+                .into_iter()
+                .map(|chunk| chunk.collect::<String>())
+                .join("\n")
+        )
+    }
+}
 
-        if cur == 40 {
-            cur = 0
+struct Cycle<'a> {
+    cycle: u32,
+    pixel: u32,
+    computer: &'a mut Computer,
+}
+
+// won't work without it
+impl<'a> Drop for Cycle<'a> {
+    fn drop(&mut self) {
+        self.computer.cycles += 1;
+    }
+}
+
+impl Computer {
+    fn new() -> Self {
+        Computer {
+            x: 1,
+            cycles: 0,
+            display_string: "".to_string(),
         }
-
-        sprite_range = (value - 1)..=(value + 1);
-
-        match action {
-            Action::Addx(n) => {
-                // addx cycle 1 insert last value, cycle 2 insert new value
-                // println!("Start cycle  {cycle}: begin executing addx: {}", n);
-                // println!("During cycle {cycle}: CRT draws pixel in position: {}", cur);
-
-                if sprite_range.contains(&cur) {
-                    result.entry(cycle).or_insert("#");
-                    // println!("#");
-                } else {
-                    result.entry(cycle).or_insert(".");
-                    // println!(".");
-                }
-
-                cycle += 1;
-                cur += 1;
-                if cur == 40 {
-                    cur = 0
-                }
-
-                // println!("During cycle {cycle}: CRT draws pixel in position: {}", cur);
-                value += n;
-                // println!(
-                //     "End of cycle {cycle}: finish executing addx {n} (Register X is now {})",
-                //     value
-                // );
-                if sprite_range.contains(&cur) {
-                    result.entry(cycle).or_insert("#");
-                    // println!("#");
-                } else {
-                    result.entry(cycle).or_insert(".");
-                    // println!(".");
-                }
-                // println!("Sprite position: {:?}", sprite_range);
-                cycle += 1;
-            }
-            Action::Noop => {
-                // noop always insert last value
-                // println!("Start cycle  {cycle}: begin executing noop");
-                // println!("CRT draws pixel in position: {}", cur);
-                if sprite_range.contains(&cur) {
-                    result.entry(cycle).or_insert("#");
-                    // println!("#");
-                } else {
-                    result.entry(cycle).or_insert(".");
-                    // println!(".");
-                }
-                // println!("End of cycle {cycle}: finish executing noop");
-                cycle += 1;
-            }
-        }
-        cur += 1;
-    });
-
-    let mut result_str = String::new();
-    let mut result_str_array: Vec<_> = vec![];
-
-    result.values().enumerate().for_each(|(ind, value)| {
-        result_str.push_str(value as &str);
-        if (ind + 1) % 40 == 0 {
-            result_str_array.push(result_str.clone());
-            result_str.clear();
-        }
-    });
-
-    // result_str_array.iter().for_each(|x| println!("{}", x));
-
-    let mut final_answer = String::new();
-    for s in result_str_array.iter() {
-        final_answer.push_str(s);
-        final_answer.push_str("\n");
     }
 
-    final_answer.trim_end().to_string()
+    fn sprite_range(&self) -> RangeInclusive<i32> {
+        (self.x - 1)..=(self.x + 1)
+    }
+
+    fn start_cycle(&mut self) -> Cycle {
+        Cycle {
+            cycle: self.cycles,
+            pixel: self.cycles % 40,
+            computer: self,
+        }
+    }
+
+    fn interpret(&mut self, instruction: &Instruction) {
+        for _ in 0..instruction.cycles() {
+            let cycle_guard = self.start_cycle();
+
+            if cycle_guard
+                .computer
+                .sprite_range()
+                .contains(&(cycle_guard.pixel as i32))
+            {
+                cycle_guard.computer.display_string.push_str("#");
+            } else {
+                cycle_guard.computer.display_string.push_str(".");
+            }
+        }
+
+        match instruction {
+            Instruction::Noop => {}
+            Instruction::Add(n) => {
+                self.x += n;
+            }
+        }
+    }
+}
+
+pub fn process_part2(input: &str) -> String {
+    let (_, instructions) = instruction_set(input).unwrap();
+
+    let computer = instructions
+        .iter()
+        .fold(Computer::new(), |mut abc, instrction| {
+            abc.interpret(instrction);
+            abc
+        });
+
+    computer.to_string()
 }
 
 #[cfg(test)]
