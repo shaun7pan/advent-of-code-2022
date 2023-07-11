@@ -1,3 +1,5 @@
+use std::vec;
+
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete;
@@ -71,7 +73,7 @@ fn packet(input: &str) -> IResult<&str, Packet> {
     ))(input)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Ord, Eq, PartialEq, PartialOrd)]
 pub struct Pair {
     left: Packet,
     right: Packet,
@@ -99,7 +101,28 @@ pub fn process_part1(input: &str) -> String {
 }
 
 pub fn process_part2(input: &str) -> String {
-    "".to_string()
+    let (_, mut pairs) = pairs(input).unwrap();
+    let packet_2 = Packet::List(vec![Packet::List(vec![Packet::Number(2)])]);
+    let packet_6 = Packet::List(vec![Packet::List(vec![Packet::Number(6)])]);
+
+    let mut packets: Vec<&Packet> = pairs
+        .iter()
+        .flat_map(|Pair { left, right }| vec![left, right])
+        .chain(vec![&packet_2, &packet_6])
+        .collect();
+
+    packets.sort();
+    let index_2 = packets
+        .iter()
+        .position(|&packet| packet == &packet_2)
+        .unwrap();
+    let index_6 = packets
+        .iter()
+        .position(|&packet| packet == &packet_6)
+        .unwrap();
+    dbg!(index_2);
+    dbg!(index_6);
+    ((index_2 + 1) * (index_6 + 1)).to_string()
 }
 
 #[cfg(test)]
@@ -117,9 +140,8 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "reason"]
     fn part2_works() {
         let result = process_part2(INPUT);
-        assert_eq!(result, 29.to_string());
+        assert_eq!(result, 140.to_string());
     }
 }
