@@ -16,6 +16,13 @@ pub enum Packet {
     Number(u32),
 }
 
+// The reason why we have to implement PartialOrd explicitly rather than derive the trait is
+// because the derive one trying to use `lt` (lessthan) which is incosistence with what we had done
+// in `Ord` implementation below.
+//
+// It’s easy to accidentally make cmp and partial_cmp disagree by deriving some of the traits and manually implementing others.
+// https://doc.rust-lang.org/std/cmp/trait.Ord.html
+//
 impl PartialOrd for Packet {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
