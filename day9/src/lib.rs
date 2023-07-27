@@ -46,6 +46,7 @@ fn parse_step(input: &str) -> IResult<&str, Vec<Direction>> {
 }
 
 pub fn process_part1(input: &str) -> String {
+    //println!("{:?}", vec!["aaa"; 5]);
     let (_, vecs) = parse_step(input).unwrap();
     let mut head = (0, 0);
     let mut tail = (0, 0);
